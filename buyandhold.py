@@ -113,7 +113,6 @@ class Leverage:
                                                          unleveraged=unleveraged)
             self.pct_ret: bool = True
             self.ret: (float or pd.Series) = self.ret / capital_required
-            print(self.ret)
 
         return self.ret
 
@@ -282,6 +281,198 @@ class RiskCalculation:
     def to_dict(self) -> dict:
 
         return {k:v for k, v in self.__dict__.items() if k not in ['risk']}
+
+class Metrics:
+    
+    avg_loss: float = None
+    avg_win: float = None
+    wr: float = None
+    std_dev: float = None
+    drawdown: pd.Series = pd.Series()
+    
+    def __init__(self, returns:pd.Series, frequency:Frequency=Frequency.NATURAL,
+                 compound:bool=True) -> None:
+        
+        self.frequency = frequency
+        self.compound = compound
+        self.returns: pd.Series = self._changeReturnsFrequency(returns=returns, 
+                                                               frequency=frequency)
+    
+    def _changeReturnsFrequency(self, returns:pd.Series, frequency:Frequency=Frequency.NATURAL
+                                ) -> pd.Series:
+    
+        if frequency == Frequency.NATURAL:
+            return returns
+        else:
+            at_frequency_str_dict: dict = {Frequency.YEAR: "Y", Frequency.WEEK: "7D", 
+                                    Frequency.MONTH: "1M", Frequency.DAY: "1D"}
+            at_frequency_str: str = at_frequency_str_dict[frequency]
+            if self.compound:
+                cumret = lambda x: ((1+x).cumprod() - 1).iloc[-1]
+                return returns.resample(at_frequency_str).apply(cumret)
+            else:
+                return returns.resample(at_frequency_str).sum()
+        
+    def _cumReturns(self, returns:pd.Series=pd.Series()) -> pd.Series:
+
+        if returns.empty:
+            returns = self.returns.copy()
+            
+        if self.compound:
+            return (1 + returns).cumprod() - 1
+        else:
+            return returns.cumsum()
+    
+    def _drawdown(self) -> pd.Series:
+        
+        cumret: pd.Series = self._cumReturns() + 1
+        self.drawdown = 1 - cumret/cumret.cummax()
+        
+        return self.drawdown
+        
+    def _removeZeros(self, inplace:bool=False) -> pd.Series:
+        
+        temp = self.returns.copy()
+        temp[temp == 0] = float('nan')
+        if inplace:
+            self.returns = temp
+            
+        return temp
+    
+    def _demean(self, returns:pd.Series=pd.Series()) -> pd.Series:
+        
+        if returns.empty:
+            returns = self.returns.copy()
+            
+        return returns - returns.mean()
+    
+    def _tailRatio(self, quantiles:list=[], quantile_1:float=None, quantile_2:float=None,
+              exact_norm:bool=False) -> float:
+        
+        if len(quantiles) >= 2:
+            q_extreme: float = max([abs(0.5-q) for q in quantiles])
+            q_std: float = min([abs(0.5-q) for q in quantiles])
+        elif quantile_1 != None and quantile_2 != None:
+            q_extreme: float = max([abs(0.5 - quantile_1), abs(0.5 - quantile_2)])
+            q_std: float = min([abs(0.5 - quantile_1), abs(0.5 - quantile_2)])
+            
+        demean: pd.Series = self._demean(returns=self._removeZeros(inplace=False))
+        q1: float = demean.quantile(q_extreme)
+        q2: float = demean.quantile(q_std)
+        pr: float = q1/q2
+
+        if exact_norm:
+            from scipy.stats import norm
+            norm_dist_ratio: float = norm.ppf(q_extreme) / norm.ppf(q_std)
+        else:
+            norm_dist_ratio: float = 4.43
+
+        return pr / norm_dist_ratio
+
+    def averageWin(self) -> float:
+        self.avg_win = self.returns[self.returns > 0].mean()
+        return self.avg_win
+    
+    def averageLoss(self) -> float:
+        self.avg_loss = self.returns[self.returns < 0].abs().mean()
+        return self.avg_loss
+    
+    def winrate(self) -> float:
+        self.wr = len(self.returns[self.returns > 0])/len(self.returns)
+        return self.wr
+
+    def profitRatio(self) -> float:
+        
+        if self.avg_win == None:
+            self.averageWin()
+        if self.avg_loss == None:
+            self.averageLoss()
+            
+        self.profit_ratio = self.avg_win/self.avg_loss
+        
+        return self.profit_ratio
+    
+    def expectancy(self) -> float:
+        
+        if self.avg_win == None:
+            self.averageWin()
+        if self.avg_loss == None:
+            self.averageLoss()
+        if self.wr == None:
+            self.winrate()
+            
+        self.expec = self.avg_win * self.wr - (1-self.wr) * self.avg_loss
+        
+        return self.expec
+    
+    def kelly(self) -> float:
+        
+        if self.wr == None:
+            self.winrate()
+        if self.profit_ratio == None:
+            self.profitRatio()
+        
+        self.kelly_size = self.wr - (1 - self.wr)/self.profit_ratio
+        
+        return self.kelly_size
+    
+    def skew(self) -> float:
+        self.dist_skew = self.returns.skew()
+        return self.dist_skew
+    
+    def standardDeviation(self) -> float:
+        self.std_dev = self.returns.std()
+        return self.std_dev
+    
+    def sharpeRatio(self) -> float:
+        
+        if self.std_dev == None:
+            self.standardDeviation()
+            
+        self.sharpe_ratio = self.returns.mean()/self.std_dev
+        
+        return self.sharpe_ratio
+        
+    def lowerTailRatio(self, exact_norm:bool=False) -> float:
+        self.lower_tail = self._tailRatio(quantile_1=0.01, quantile_2=0.3, 
+                                          exact_norm=exact_norm)
+        return self.lower_tail
+        
+    def upperTailRatio(self, exact_norm:bool=False) -> float:
+        self.upper_tail = self._tailRatio(quantile_1=0.7, quantile_2=0.99, 
+                                          exact_norm=exact_norm)
+        return self.upper_tail
+    
+    def averageDrawdown(self) -> float:
+        
+        if self.drawdown.empty:
+            self._drawdown()
+            
+        self.avg_dd = self.drawdown.mean()
+        
+        return self.avg_dd
+    
+    def maxDrawdown(self) -> float:
+        
+        if self.drawdown.empty:
+            self._drawdown()
+            
+        self.max_dd = self.drawdown.max()
+        
+        return self.max_dd
+
+    def calculateMetrics(self, indicators:list=['expectancy', 'sharpeRatio', 
+                                                'maxDrawdown']) -> float:
+        
+        for ind in indicators:
+            
+            method = getattr(self, ind)
+            method()
+            
+    def to_dict(self) -> dict:
+        
+        return {k: v for k, v in self.__dict__.items() \
+            if k not in ['returns', 'drawdown', 'compound', 'frequency']}
 
 def changeReturnsFrequency(returns:pd.Series, frequency:Frequency=Frequency.NATURAL, 
                            compound:bool=True) -> pd.Series:
@@ -487,35 +678,6 @@ def tailRatio(returns:pd.Series, quantiles:list=[], quantile_1:float=None, quant
 
     return pr / norm_dist_ratio
 
-def metrics(ret:pd.Series, exact_norm:bool=False) -> dict:
-
-    ret.dropna(inplace=True)
-    cumret = cumReturns(returns, compound=False) + 1
-    drawdown = 1 - cumret/cumret.cummax()
-
-    wins = ret[ret > 0]
-    loss = ret[ret < 0]
-    tot_ret = cumret.iloc[-1] - 1
-    total_trades = len(ret)
-    avg_win = wins.mean()
-    avg_loss = loss.abs().mean()
-    winrate = len(wins)/total_trades
-    p_ratio = avg_win/avg_loss
-    expectancy = avg_win * winrate - (1-winrate) * avg_loss
-    kelly = winrate - (1 - winrate)/p_ratio
-    skew = ret.skew()
-    deviation = ret.std()
-    sharpe = ret.mean()/deviation
-    lower_tail = tailRatio(ret, quantile_1=0.01, quantile_2=0.3, exact_norm=exact_norm)
-    upper_tail = tailRatio(ret, quantile_1=0.7, quantile_2=0.99, exact_norm=exact_norm)
-    avg_dd = drawdown.mean()
-    max_dd = drawdown.max()
-
-    return {'total_trades': total_trades, 'avg_win': avg_win, 'avg_loss': avg_loss,
-            'winrate': winrate, 'p_ratio': p_ratio, 'expectancy': expectancy, 'kelly': kelly,
-            'skew': skew, 'deviation': deviation, 'sharpe': sharpe, 'lower_tail': lower_tail,
-            'upper_tail': upper_tail, 'avg_dd': avg_dd, 'max_dd': max_dd, 'total_ret': tot_ret}
-
 def volatAproximation(data:pd.DataFrame) -> pd.DataFrame:
 
     data['std'] = data['Close'].rolling(22).std()
@@ -540,11 +702,20 @@ data = calculateSize(data=data, price_name='underlying', capital=capital,
                      risk=risk, volat_target=0.2, #currency=currency['Close'], 
                      leverage=leverage, min_size=min_size, compound=compound)
 
+data['size'] = pd.Series(5, index=data.index)
+
 data['drawdown'] = 1 - data['capital']/data['capital'].cummax()
 returns = calculatePercReturns(position_size=data['size'], adjusted_price=data['Close'], 
                                current_price=data['Close'], currency=currency['Close'], 
-                               leverage=1, frequency=Frequency.YEAR, compound=compound)
-print(metrics(ret=returns, exact_norm=exact_norm))
+                               leverage=1, frequency=Frequency.NATURAL, compound=compound)
+
+import json
+
+metrics = Metrics(returns=returns, frequency=Frequency.YEAR, compound=False)
+stats = metrics.calculateMetrics(indicators=['standardDeviation', 'sharpeRatio',
+                                             'skew', 'averageDrawdown', 'maxDrawdown',
+                                             'lowerTailRatio', 'upperTailRatio'])
+print(json.dumps(stats, indent=4))
 
 if False:
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.0,
