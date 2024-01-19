@@ -91,6 +91,7 @@ class Leverage:
     
     def calculateReturn(self, entry:(float or pd.Series), 
                         exit:(float or pd.Series), 
+                        rcapital: (float or pd.Series),
                         position:(float or pd.Series)=None,
                         currency:(float or pd.Series)=1,
                         unleveraged:bool=False,
@@ -102,13 +103,13 @@ class Leverage:
         if isinstance(currency, pd.Series) and isinstance(exit, pd.Series):
             currency = currency.reindex(exit.index, method="ffill")
             
-        self.ret: (float or pd.Series) = (exit - entry) * position * currency
+        self.ret: (float or pd.Series) = (exit - entry) * position * currency # entry y exit son unadjusted, según RC tendrían que ser adjusted?
         if self.type == self.Type.PRICE:
             self.ret = self.ret * self.value
 
         if pct:
             capital_required: (float or pd.Series) = self.calculateRequiredCapital(
-                                                         price=exit, # No debería ser entry?
+                                                         price=rcapital, # No debería ser entry? Ahora es unadjusted 
                                                          position=position, 
                                                          unleveraged=unleveraged)
             self.pct_ret: bool = True
@@ -284,6 +285,7 @@ class RiskCalculation:
 
 class Metrics:
     
+    avg_ret: float = None
     avg_loss: float = None
     avg_win: float = None
     wr: float = None
@@ -291,12 +293,15 @@ class Metrics:
     drawdown: pd.Series = pd.Series()
     
     def __init__(self, returns:pd.Series, frequency:Frequency=Frequency.NATURAL,
-                 compound:bool=True) -> None:
+                 compound:bool=True, annualized:bool=True) -> None:
         
-        self.frequency = frequency
-        self.compound = compound
+        self.frequency: Frequency = frequency
+        self.compound: bool = compound
+        self.annualized: bool = annualized
         self.returns: pd.Series = self._changeReturnsFrequency(returns=returns, 
                                                                frequency=frequency)
+        self.annualized_ret: pd.Series = self._changeReturnsFrequency(returns=returns,
+                                                                frequency=Frequency.YEAR)
     
     def _changeReturnsFrequency(self, returns:pd.Series, frequency:Frequency=Frequency.NATURAL
                                 ) -> pd.Series:
@@ -316,7 +321,8 @@ class Metrics:
     def _cumReturns(self, returns:pd.Series=pd.Series()) -> pd.Series:
 
         if returns.empty:
-            returns = self.returns.copy()
+            returns = self.annualized_ret.copy() if self.annualized \
+                    else self.returns.copy()
             
         if self.compound:
             return (1 + returns).cumprod() - 1
@@ -324,15 +330,18 @@ class Metrics:
             return returns.cumsum()
     
     def _drawdown(self) -> pd.Series:
+
+        returns = self.annualized_ret.copy() if self.annualized \
+                    else self.returns.copy()
         
-        cumret: pd.Series = self._cumReturns() + 1
+        cumret: pd.Series = self._cumReturns(returns=returns) + 1
         self.drawdown = 1 - cumret/cumret.cummax()
         
         return self.drawdown
         
     def _removeZeros(self, inplace:bool=False) -> pd.Series:
         
-        temp = self.returns.copy()
+        temp = self.annualized_ret.copy() if self.annualized else self.returns.copy()
         temp[temp == 0] = float('nan')
         if inplace:
             self.returns = temp
@@ -342,12 +351,13 @@ class Metrics:
     def _demean(self, returns:pd.Series=pd.Series()) -> pd.Series:
         
         if returns.empty:
-            returns = self.returns.copy()
+            returns = self.annualized_ret.copy() if self.annualized \
+                    else self.returns.copy()
             
         return returns - returns.mean()
     
     def _tailRatio(self, quantiles:list=[], quantile_1:float=None, quantile_2:float=None,
-              exact_norm:bool=False) -> float:
+              exact_norm:bool=True) -> float:
         
         if len(quantiles) >= 2:
             q_extreme: float = max([abs(0.5-q) for q in quantiles])
@@ -369,12 +379,25 @@ class Metrics:
 
         return pr / norm_dist_ratio
 
+    def averageReturn(self) -> float:
+        
+        self.avg_ret = self.annualized_ret.mean() \
+            if self.annualized else self.returns.mean()
+        
+        return self.avg_ret
+
     def averageWin(self) -> float:
-        self.avg_win = self.returns[self.returns > 0].mean()
+        
+        self.avg_win = self.annualized_ret[self.annualized_ret > 0].mean() \
+            if self.annualized else self.returns[self.returns > 0].mean()
+        
         return self.avg_win
     
     def averageLoss(self) -> float:
-        self.avg_loss = self.returns[self.returns < 0].abs().mean()
+        
+        self.avg_win = self.annualized_ret[self.annualized_ret < 0].mean() \
+            if self.annualized else self.returns[self.returns < 0].mean()
+        
         return self.avg_loss
     
     def winrate(self) -> float:
@@ -417,30 +440,42 @@ class Metrics:
         return self.kelly_size
     
     def skew(self) -> float:
-        self.dist_skew = self.returns.skew()
+        
+        self.dist_skew = self.annualized_ret.skew() \
+            if self.annualized else self.returns.skew()
+        
         return self.dist_skew
     
     def standardDeviation(self) -> float:
-        self.std_dev = self.returns.std()
+        
+        self.std_dev = self.annualized_ret.std() \
+            if self.annualized else self.returns.std()
+        
         return self.std_dev
     
     def sharpeRatio(self) -> float:
         
         if self.std_dev == None:
             self.standardDeviation()
+        if self.avg_ret == None:
+            self.averageReturn()
             
-        self.sharpe_ratio = self.returns.mean()/self.std_dev
+        self.sharpe_ratio = self.avg_ret/self.std_dev
         
         return self.sharpe_ratio
         
-    def lowerTailRatio(self, exact_norm:bool=False) -> float:
+    def lowerTailRatio(self, exact_norm:bool=True) -> float:
+
         self.lower_tail = self._tailRatio(quantile_1=0.01, quantile_2=0.3, 
                                           exact_norm=exact_norm)
+        
         return self.lower_tail
         
-    def upperTailRatio(self, exact_norm:bool=False) -> float:
+    def upperTailRatio(self, exact_norm:bool=True) -> float:
+
         self.upper_tail = self._tailRatio(quantile_1=0.7, quantile_2=0.99, 
                                           exact_norm=exact_norm)
+        
         return self.upper_tail
     
     def averageDrawdown(self) -> float:
@@ -462,106 +497,111 @@ class Metrics:
         return self.max_dd
 
     def calculateMetrics(self, indicators:list=['expectancy', 'sharpeRatio', 
-                                                'maxDrawdown']) -> float:
+                        'maxDrawdown'], return_dict:bool=True) -> float:
         
         for ind in indicators:
             
-            method = getattr(self, ind)
+            method = self.__getattribute__(ind)
             method()
+
+        if return_dict:
+            return self.to_dict()
             
     def to_dict(self) -> dict:
         
         return {k: v for k, v in self.__dict__.items() \
-            if k not in ['returns', 'drawdown', 'compound', 'frequency']}
+            if k not in ['returns', 'drawdown', 'compound', 'frequency', 
+                         'annualized', 'annualized_ret']}
 
-def changeReturnsFrequency(returns:pd.Series, frequency:Frequency=Frequency.NATURAL, 
-                           compound:bool=True) -> pd.Series:
-    
-    if frequency == Frequency.NATURAL:
-        return returns
-    else:
-        at_frequency_str_dict: dict = {Frequency.YEAR: "Y", Frequency.WEEK: "7D", 
-                                 Frequency.MONTH: "1M"}
-        at_frequency_str: str = at_frequency_str_dict[frequency]
-        if compound:
-            return ((1+returns).cumprod()).resample(at_frequency_str).last()
-        else:
-            return returns.resample(at_frequency_str).sum()
+class Returns:
+
+    class Type(Enum):
+        SIMPLE = 'simple'
+        COMPOUND = 'compound'
+
+    def __init__(self, adjusted:pd.Series, current:pd.Series, 
+                 calc_type:Type=Type.COMPOUND) -> None:
+
+        # Check if any error
+        if adjusted.empty and current.empty:
+            raise ValueError('You must pass at least one price type as argument')
+        elif adjusted.empty and not current.empty:
+            adjusted: pd.Series = current.copy()
+        elif not adjusted.empty and current.empty:
+            current: pd.Series = adjusted.copy()
+
+        self.adjusted: pd.Series = adjusted
+        self.current: pd.Series = current
+        self.calc_type: self.Type = calc_type
+
+    def calculatePricePercChange(self, frequency:Frequency=Frequency.NATURAL) -> pd.Series:
+
+        # Calculate Percentage Change
+        daily_price_changes: pd.Series = self.adjusted.diff(periods=1)
+        percentage_changes: pd.Series = daily_price_changes / self.current.shift(periods=1)
+
+        # Change returns frequency
+        perc_changes_at_freq: pd.Series = self.changeReturnsFrequency(returns=percentage_changes, 
+                                                                frequency=frequency)
+
+        return perc_changes_at_freq
+
+    def calculatePercReturns(self, position_size:(float or pd.Series), 
+                            currency:pd.Series=pd.Series(), 
+                            leverage:Leverage=Leverage(type=Leverage.Type.SIZE, value=1.0), 
+                            frequency:Frequency=Frequency.NATURAL) -> pd.Series:
         
-def cumReturns(returns:pd.Series, compound:bool=True) -> pd.Series:
+        leverage = copy.deepcopy(leverage)
 
-    if compound:
-        return (1 + returns).cumprod() - 1
-    else:
-        return returns.cumsum()
+        # Give default values
+        if isinstance(currency, float) or isinstance(currency, int):
+            currency: pd.Series = pd.Series(currency, index=self.adjusted.index)
+        elif currency.empty:
+            currency: pd.Series = pd.Series(1, index=self.adjusted.index)
 
-def calculatePricePercChange(adjusted:pd.Series, current:pd.Series, 
-                             frequency:Frequency=Frequency.NATURAL, 
-                             compound:bool=True) -> pd.Series:
+        if isinstance(position_size, float) or isinstance(position_size, int):
+            position_size: pd.Series = pd.Series(position_size, index=self.adjusted.index)
+        elif position_size.empty:
+            position_size: pd.Series = pd.Series(1, index=self.adjusted.index)
+
+        # Calculate returns
+        perc_return: pd.Series = leverage.calculateReturn(entry=self.adjusted.shift(periods=1), rcapital=self.current,
+                                            exit=self.adjusted, position=position_size.shift(periods=1),
+                                            currency=currency, unleveraged=True, pct=True)
+        
+        if False:
+            return_price: pd.Series = adjusted_price.diff(periods=1) * position_size.shift(periods=1)
+            fx_series_aligned: pd.Series = currency.reindex(return_price.index, method="ffill")
+            return_currency: pd.Series = return_price * fx_series_aligned
+            perc_return: pd.Series = return_currency / leverage.calculateRequiredCapital(position=position_size, 
+                                                                                    price=current_price, 
+                                                                                    unleveraged=True)
+
+        # Change returns frequency
+        perc_return_at_freq: pd.Series = self.changeReturnsFrequency(returns=perc_return, frequency=frequency)
+
+        return perc_return_at_freq
     
-    # Check if any error
-    if adjusted.empty and current.empty:
-        raise ValueError('You must pass at least one price type as argument')
-    elif adjusted.empty and not current.empty:
-        adjusted: pd.Series = current.copy()
-    elif not adjusted.empty and current.empty:
-        current: pd.Series = adjusted.copy()
+    def changeReturnsFrequency(self, returns:pd.Series, frequency:Frequency=Frequency.NATURAL) -> pd.Series:
+        
+        if frequency == Frequency.NATURAL:
+            return returns
+        else:
+            at_frequency_str_dict: dict = {Frequency.YEAR: "Y", Frequency.WEEK: "7D", 
+                                    Frequency.MONTH: "1M"}
+            at_frequency_str: str = at_frequency_str_dict[frequency]
+            if self.calc_type:
+                return ((1+returns).cumprod()).resample(at_frequency_str).last()
+            else:
+                return returns.resample(at_frequency_str).sum()
+            
+    def cumReturns(self, returns:pd.Series) -> pd.Series:
 
-    # Calculate Percentage Change
-    daily_price_changes: pd.Series = adjusted.diff(periods=1)
-    percentage_changes: pd.Series = daily_price_changes / current.shift(periods=1)
+        if self.calc_type:
+            return (1 + returns).cumprod() - 1
+        else:
+            return returns.cumsum()
 
-    # Change returns frequency
-    perc_changes_at_freq: pd.Series = changeReturnsFrequency(returns=percentage_changes, 
-                                                  frequency=frequency, 
-                                                  compound=compound)
-
-    return perc_changes_at_freq
-
-def calculatePercReturns(position_size:(float or pd.Series), adjusted_price:pd.Series=pd.Series(), 
-                         current_price:(float or pd.Series)=pd.Series(), currency:pd.Series=pd.Series(), 
-                         leverage:Leverage=Leverage(type=Leverage.Type.SIZE, value=1.0), 
-                         frequency:Frequency=Frequency.NATURAL, compound:bool=True) -> pd.Series:
-    
-    leverage = copy.deepcopy(leverage)
-
-    # Check if any error
-    if adjusted_price.empty and current_price.empty:
-        raise ValueError('You must pass at least one price type as argument')
-    elif adjusted_price.empty and not current_price.empty:
-        adjusted_price = current_price.copy()
-    elif not adjusted_price.empty and current_price.empty:
-        current_price = adjusted_price.copy()
-
-    # Give default values
-    if isinstance(currency, float) or isinstance(currency, int):
-        currency: pd.Series = pd.Series(currency, index=adjusted_price.index)
-    elif currency.empty:
-        currency: pd.Series = pd.Series(1, index=adjusted_price.index)
-
-    if isinstance(position_size, float) or isinstance(position_size, int):
-        position_size: pd.Series = pd.Series(position_size, index=adjusted_price.index)
-    elif position_size.empty:
-        position_size: pd.Series = pd.Series(1, index=adjusted_price.index)
-
-    # Calculate returns
-    perc_return: pd.Series = leverage.calculateReturn(entry=current_price.shift(periods=1),
-                                           exit=current_price, position=position_size.shift(periods=1),
-                                           currency=currency, unleveraged=True, pct=True)
-    
-    if False:
-        return_price: pd.Series = adjusted_price.diff(periods=1) * position_size.shift(periods=1)
-        fx_series_aligned: pd.Series = currency.reindex(return_price.index, method="ffill")
-        return_currency: pd.Series = return_price * fx_series_aligned
-        perc_return: pd.Series = return_currency / leverage.calculateRequiredCapital(position=position_size, 
-                                                                                 price=current_price, 
-                                                                                 unleveraged=True)
-
-    # Change returns frequency
-    perc_return_at_freq: pd.Series = changeReturnsFrequency(returns=perc_return, frequency=frequency, 
-                                                 compound=compound)
-
-    return perc_return_at_freq
 
 def dtIndexToDate(index_series) -> list:
 
@@ -596,7 +636,7 @@ def getCurrencyForData(curr:str, data:pd.DataFrame, inverse:bool=False) -> pd.Da
 
 def calculateSize(data:pd.DataFrame, capital:float, risk:float, volat_target:(float or pd.Series), 
          currency:pd.Series=None, min_size:int=1, leverage:Leverage=Leverage(type=Leverage.Type.SIZE, value=1), 
-         price_name:str='Close', compound:bool=True) -> pd.DataFrame:
+         price_name:str='Close', compound:Returns.Type=Returns.Type.COMPOUND) -> pd.DataFrame:
 
     leverage = copy.deepcopy(leverage)
 
@@ -621,7 +661,7 @@ def calculateSize(data:pd.DataFrame, capital:float, risk:float, volat_target:(fl
     temp_df['volat_target'] = volat_target
     temp_df.dropna(inplace=True)
 
-    if not compound:
+    if compound != Returns.Type.COMPOUND:
         size: pd.Series = leverage.calculateSize(capital=capital, risk=risk, price=temp_df['price'], 
                                                  currency=temp_df['currency'], 
                                                  asset_risk=temp_df['volat_target'])
@@ -655,29 +695,6 @@ def calculateSize(data:pd.DataFrame, capital:float, risk:float, volat_target:(fl
 
     return data
 
-def tailRatio(returns:pd.Series, quantiles:list=[], quantile_1:float=None, quantile_2:float=None,
-              exact_norm:bool=False) -> float:
-    
-
-    demean: pd.Series = returns - returns.mean()
-    if len(quantiles) >= 2:
-        q_extreme: float = max([abs(0.5-q) for q in quantiles])
-        q_std: float = min([abs(0.5-q) for q in quantiles])
-    elif quantile_1 != None and quantile_2 != None:
-        q_extreme: float = max([abs(0.5 - quantile_1), abs(0.5 - quantile_2)])
-        q_std: float = min([abs(0.5 - quantile_1), abs(0.5 - quantile_2)])
-    q1: float = demean.quantile(q_extreme)
-    q2: float = demean.quantile(q_std)
-    pr: float = q1/q2
-
-    if exact_norm:
-        from scipy.stats import norm
-        norm_dist_ratio: float = norm.ppf(q_extreme) / norm.ppf(q_std)
-    else:
-        norm_dist_ratio: float = 4.43
-
-    return pr / norm_dist_ratio
-
 def volatAproximation(data:pd.DataFrame) -> pd.DataFrame:
 
     data['std'] = data['Close'].rolling(22).std()
@@ -692,8 +709,7 @@ capital = 5000
 risk = 0.20
 min_size = 1
 leverage = Leverage(type=Leverage.Type.SIZE, value=5)
-exact_norm = False
-compound = False
+compound = Returns.Type.COMPOUND
 
 data: pd.DataFrame = getData('SPY')
 data, currency = getCurrencyForData('EURUSD=X', data=data, inverse=True)
@@ -702,20 +718,22 @@ data = calculateSize(data=data, price_name='underlying', capital=capital,
                      risk=risk, volat_target=0.2, #currency=currency['Close'], 
                      leverage=leverage, min_size=min_size, compound=compound)
 
-data['size'] = pd.Series(5, index=data.index)
-
 data['drawdown'] = 1 - data['capital']/data['capital'].cummax()
-returns = calculatePercReturns(position_size=data['size'], adjusted_price=data['Close'], 
-                               current_price=data['Close'], currency=currency['Close'], 
-                               leverage=1, frequency=Frequency.NATURAL, compound=compound)
+returnsObj = Returns(adjusted=data['Close'], current=data['Close'], calc_type=compound)
+returns = returnsObj.calculatePercReturns(position_size=pd.Series(5, index=data.index), 
+                                          currency=currency['Close'], leverage=leverage, 
+                                          frequency=Frequency.NATURAL)
 
 import json
 
 metrics = Metrics(returns=returns, frequency=Frequency.YEAR, compound=False)
-stats = metrics.calculateMetrics(indicators=['standardDeviation', 'sharpeRatio',
-                                             'skew', 'averageDrawdown', 'maxDrawdown',
-                                             'lowerTailRatio', 'upperTailRatio'])
+stats = metrics.calculateMetrics(indicators=['averageReturn','standardDeviation', 
+                                             'sharpeRatio','skew', 'averageDrawdown', 
+                                             'maxDrawdown','lowerTailRatio', 
+                                             'upperTailRatio'], return_dict=True)
 print(json.dumps(stats, indent=4))
+
+'1982-12-14'
 
 if False:
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.0,
