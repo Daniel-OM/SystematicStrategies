@@ -54,7 +54,7 @@ def calculate_perc_returns(position_contracts_held: pd.Series,
     fx_series_aligned = fx_series.reindex(return_instrument_currency.index, method="ffill")
     return_base_currency = return_instrument_currency * fx_series_aligned
 
-    perc_return = return_base_currency / capital_required
+    perc_return = return_base_currency / capital_required.shift(1)
 
     return perc_return
 

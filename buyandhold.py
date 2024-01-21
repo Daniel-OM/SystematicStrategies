@@ -113,7 +113,7 @@ class Leverage:
                                                          position=position, 
                                                          unleveraged=unleveraged)
             self.pct_ret: bool = True
-            self.ret: (float or pd.Series) = self.ret / capital_required
+            self.ret: (float or pd.Series) = self.ret / capital_required.shift(1)
 
         return self.ret
 
@@ -367,15 +367,12 @@ class Metrics:
             q_std: float = min([abs(0.5 - quantile_1), abs(0.5 - quantile_2)])
             
         demean: pd.Series = self._demean(returns=self._removeZeros(inplace=False))
-        q1: float = demean.quantile(q_extreme)
-        q2: float = demean.quantile(q_std)
-        pr: float = q1/q2
+        pr: float = demean.quantile(q_extreme) / demean.quantile(q_std)
 
+        norm_dist_ratio: float = 4.43
         if exact_norm:
             from scipy.stats import norm
             norm_dist_ratio: float = norm.ppf(q_extreme) / norm.ppf(q_std)
-        else:
-            norm_dist_ratio: float = 4.43
 
         return pr / norm_dist_ratio
 
@@ -537,8 +534,7 @@ class Returns:
     def calculatePricePercChange(self, frequency:Frequency=Frequency.NATURAL) -> pd.Series:
 
         # Calculate Percentage Change
-        daily_price_changes: pd.Series = self.adjusted.diff(periods=1)
-        percentage_changes: pd.Series = daily_price_changes / self.current.shift(periods=1)
+        percentage_changes: pd.Series = self.adjusted.diff(periods=1) / self.current.shift(periods=1)
 
         # Change returns frequency
         perc_changes_at_freq: pd.Series = self.changeReturnsFrequency(returns=percentage_changes, 
@@ -568,14 +564,6 @@ class Returns:
         perc_return: pd.Series = leverage.calculateReturn(entry=self.adjusted.shift(periods=1), rcapital=self.current,
                                             exit=self.adjusted, position=position_size.shift(periods=1),
                                             currency=currency, unleveraged=True, pct=True)
-        
-        if False:
-            return_price: pd.Series = adjusted_price.diff(periods=1) * position_size.shift(periods=1)
-            fx_series_aligned: pd.Series = currency.reindex(return_price.index, method="ffill")
-            return_currency: pd.Series = return_price * fx_series_aligned
-            perc_return: pd.Series = return_currency / leverage.calculateRequiredCapital(position=position_size, 
-                                                                                    price=current_price, 
-                                                                                    unleveraged=True)
 
         # Change returns frequency
         perc_return_at_freq: pd.Series = self.changeReturnsFrequency(returns=perc_return, frequency=frequency)
@@ -726,7 +714,8 @@ returns = returnsObj.calculatePercReturns(position_size=pd.Series(5, index=data.
 
 import json
 
-metrics = Metrics(returns=returns, frequency=Frequency.YEAR, compound=False)
+metrics = Metrics(returns=returns, frequency=Frequency.YEAR, compound=False, 
+                  annualized=True)
 stats = metrics.calculateMetrics(indicators=['averageReturn','standardDeviation', 
                                              'sharpeRatio','skew', 'averageDrawdown', 
                                              'maxDrawdown','lowerTailRatio', 
