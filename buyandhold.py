@@ -15,6 +15,7 @@ import plotly.graph_objects as go
 class Frequency(Enum):
 
     NATURAL: str = 'natural'
+    BUSINESSDAY: str = 'businessday'
     DAY: str = 'day'
     WEEK: str = 'week'
     MONTH: str = 'month'
@@ -35,14 +36,234 @@ class Transitions():
     def businessDaysToYear(self, days:float) -> float: return days/self.BUSINESS_DAYS_IN_YEAR
     def businessDaysToMonth(self, days:float) -> float: 
         return days/self.BUSINESS_DAYS_IN_YEAR*self.MONTHS_IN_YEAR
-    def businessDaysToWeek(self, days:float) -> float: 
-        return days/self.BUSINESS_DAYS_IN_YEAR/self.BUSINESS_DAYS_IN_WEEK
+    def businessDaysToWeek(self, days:float) -> float: return days/self.BUSINESS_DAYS_IN_WEEK
     def daysToYear(self, days:float) -> float: return days/self.DAYS_IN_YEAR
     def daysToMonth(self, days:float) -> float: return days/self.DAYS_IN_YEAR*self.MONTHS_IN_YEAR
     def daysToWeek(self, days:float) -> float: return days/self.DAYS_IN_WEEK
     def weekToMonth(self, weeks:float) -> float: return weeks/self.WEEKS_IN_YEAR*self.MONTHS_IN_YEAR
     def weekToYear(self, weeks:float) -> float: return weeks/self.WEEKS_IN_YEAR
     def monthToYear(self, months:float) -> float: return months/self.MONTHS_IN_YEAR
+
+    def simpleChange(self, data:float, first_frequency:Frequency, second_frequency:Frequency
+               ) -> float:
+        
+        if first_frequency == Frequency.NATURAL:
+            raise ValueError('The original Frequency can not be NATURAL. It must be explicit.')
+        elif second_frequency == Frequency.NATURAL:
+            return data
+        
+        if first_frequency == Frequency.DAY:
+            if second_frequency == Frequency.DAY:
+                return data
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return data / self.DAYS_IN_WEEK * self.BUSINESS_DAYS_IN_WEEK
+            elif second_frequency == Frequency.WEEK:
+                return data / self.DAYS_IN_WEEK
+            elif second_frequency == Frequency.MONTH:
+                return data / self.DAYS_IN_YEAR * self.MONTHS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return data / self.DAYS_IN_YEAR
+            
+        elif first_frequency == Frequency.BUSINESSDAY:
+            if second_frequency == Frequency.DAY:
+                return data / self.BUSINESS_DAYS_IN_WEEK * self.DAYS_IN_WEEK 
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return data
+            elif second_frequency == Frequency.WEEK:
+                return data / self.BUSINESS_DAYS_IN_WEEK
+            elif second_frequency == Frequency.MONTH:
+                return data / self.BUSINESS_DAYS_IN_YEAR * self.MONTHS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return data / self.BUSINESS_DAYS_IN_YEAR
+            
+        elif first_frequency == Frequency.WEEK:
+            if second_frequency == Frequency.DAY:
+                return data * self.DAYS_IN_WEEK 
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return data * self.BUSINESS_DAYS_IN_WEEK
+            elif second_frequency == Frequency.WEEK:
+                return data
+            elif second_frequency == Frequency.MONTH:
+                return data / self.WEEKS_IN_YEAR * self.MONTHS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return data / self.WEEKS_IN_YEAR
+            
+        elif first_frequency == Frequency.MONTH:
+            if second_frequency == Frequency.DAY:
+                return data * self.DAYS_IN_YEAR / self.MONTHS_IN_YEAR 
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return data * self.BUSINESS_DAYS_IN_YEAR / self.MONTHS_IN_YEAR 
+            elif second_frequency == Frequency.WEEK:
+                return data * self.WEEKS_IN_YEAR / self.MONTHS_IN_YEAR 
+            elif second_frequency == Frequency.MONTH:
+                return data
+            elif second_frequency == Frequency.YEAR:
+                return data / self.MONTHS_IN_YEAR
+            
+        elif first_frequency == Frequency.YEAR:
+            if second_frequency == Frequency.DAY:
+                return data * self.DAYS_IN_YEAR
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return data * self.BUSINESS_DAYS_IN_YEAR
+            elif second_frequency == Frequency.WEEK:
+                return data * self.WEEKS_IN_YEAR
+            elif second_frequency == Frequency.MONTH:
+                return data * self.MONTHS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return data
+            
+        raise ValueError(f'Something went wrong for {data} with original frequency '+
+                         f'beeing {first_frequency} and final frequency {second_frequency}')
+
+    def compoundChange(self, data:float, first_frequency:Frequency, second_frequency:Frequency
+               ) -> float:
+        
+        '''
+        NOT APPLIED!!
+        '''
+        
+        if first_frequency == Frequency.NATURAL:
+            raise ValueError('The original Frequency can not be NATURAL. It must be explicit.')
+        elif second_frequency == Frequency.NATURAL:
+            return data
+        
+        if first_frequency == Frequency.DAY:
+            if second_frequency == Frequency.DAY:
+                return data
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return data / self.DAYS_IN_WEEK * self.BUSINESS_DAYS_IN_WEEK
+            elif second_frequency == Frequency.WEEK:
+                return data / self.DAYS_IN_WEEK
+            elif second_frequency == Frequency.MONTH:
+                return data / self.DAYS_IN_YEAR * self.MONTHS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return data / self.DAYS_IN_YEAR
+            
+        elif first_frequency == Frequency.BUSINESSDAY:
+            if second_frequency == Frequency.DAY:
+                return data / self.BUSINESS_DAYS_IN_WEEK * self.DAYS_IN_WEEK 
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return data
+            elif second_frequency == Frequency.WEEK:
+                return data / self.BUSINESS_DAYS_IN_WEEK
+            elif second_frequency == Frequency.MONTH:
+                return data / self.BUSINESS_DAYS_IN_YEAR * self.MONTHS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return data / self.BUSINESS_DAYS_IN_YEAR
+            
+        elif first_frequency == Frequency.WEEK:
+            if second_frequency == Frequency.DAY:
+                return data * self.DAYS_IN_WEEK 
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return data * self.BUSINESS_DAYS_IN_WEEK
+            elif second_frequency == Frequency.WEEK:
+                return data
+            elif second_frequency == Frequency.MONTH:
+                return data / self.WEEKS_IN_YEAR * self.MONTHS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return data / self.WEEKS_IN_YEAR
+            
+        elif first_frequency == Frequency.MONTH:
+            if second_frequency == Frequency.DAY:
+                return data * self.DAYS_IN_YEAR / self.MONTHS_IN_YEAR 
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return data * self.BUSINESS_DAYS_IN_YEAR / self.MONTHS_IN_YEAR 
+            elif second_frequency == Frequency.WEEK:
+                return data * self.WEEKS_IN_YEAR / self.MONTHS_IN_YEAR 
+            elif second_frequency == Frequency.MONTH:
+                return data
+            elif second_frequency == Frequency.YEAR:
+                return data / self.MONTHS_IN_YEAR
+            
+        elif first_frequency == Frequency.YEAR:
+            if second_frequency == Frequency.DAY:
+                return data * self.DAYS_IN_YEAR
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return data * self.BUSINESS_DAYS_IN_YEAR
+            elif second_frequency == Frequency.WEEK:
+                return data * self.WEEKS_IN_YEAR
+            elif second_frequency == Frequency.MONTH:
+                return data * self.MONTHS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return data
+            
+        raise ValueError(f'Something went wrong for {data} with original frequency '+
+                         f'beeing {first_frequency} and final frequency {second_frequency}')
+
+    def getChange(self, first_frequency:Frequency, second_frequency:Frequency
+               ) -> float:
+        
+        '''
+        Obtain ratio to multiply.
+        '''
+        
+        if first_frequency == Frequency.NATURAL:
+            raise ValueError('The original Frequency can not be NATURAL. It must be explicit.')
+        elif second_frequency == Frequency.NATURAL:
+            return 1
+        
+        if first_frequency == Frequency.DAY:
+            if second_frequency == Frequency.DAY:
+                return 1
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return self.BUSINESS_DAYS_IN_WEEK / self.DAYS_IN_WEEK
+            elif second_frequency == Frequency.WEEK:
+                return 1 / self.DAYS_IN_WEEK
+            elif second_frequency == Frequency.MONTH:
+                return self.MONTHS_IN_YEAR / self.DAYS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return 1 / self.DAYS_IN_YEAR
+            
+        elif first_frequency == Frequency.BUSINESSDAY:
+            if second_frequency == Frequency.DAY:
+                return self.DAYS_IN_WEEK / self.BUSINESS_DAYS_IN_WEEK
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return 1
+            elif second_frequency == Frequency.WEEK:
+                return 1 / self.BUSINESS_DAYS_IN_WEEK
+            elif second_frequency == Frequency.MONTH:
+                return self.MONTHS_IN_YEAR / self.BUSINESS_DAYS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return 1 / self.BUSINESS_DAYS_IN_YEAR
+            
+        elif first_frequency == Frequency.WEEK:
+            if second_frequency == Frequency.DAY:
+                return self.DAYS_IN_WEEK 
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return self.BUSINESS_DAYS_IN_WEEK
+            elif second_frequency == Frequency.WEEK:
+                return 1
+            elif second_frequency == Frequency.MONTH:
+                return self.MONTHS_IN_YEAR / self.WEEKS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return 1 / self.WEEKS_IN_YEAR
+            
+        elif first_frequency == Frequency.MONTH:
+            if second_frequency == Frequency.DAY:
+                return self.DAYS_IN_YEAR / self.MONTHS_IN_YEAR 
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return self.BUSINESS_DAYS_IN_YEAR / self.MONTHS_IN_YEAR 
+            elif second_frequency == Frequency.WEEK:
+                return self.WEEKS_IN_YEAR / self.MONTHS_IN_YEAR 
+            elif second_frequency == Frequency.MONTH:
+                return 1
+            elif second_frequency == Frequency.YEAR:
+                return 1 / self.MONTHS_IN_YEAR
+            
+        elif first_frequency == Frequency.YEAR:
+            if second_frequency == Frequency.DAY:
+                return self.DAYS_IN_YEAR
+            elif second_frequency == Frequency.BUSINESSDAY:
+                return self.BUSINESS_DAYS_IN_YEAR
+            elif second_frequency == Frequency.WEEK:
+                return self.WEEKS_IN_YEAR
+            elif second_frequency == Frequency.MONTH:
+                return self.MONTHS_IN_YEAR
+            elif second_frequency == Frequency.YEAR:
+                return 1
+            
+        raise ValueError(f'Something went wrong with original frequency '+
+                         f'beeing {first_frequency} and final frequency {second_frequency}')
 
 class Leverage:
      
@@ -58,19 +279,32 @@ class Leverage:
         self.value: float = value
 
     def calculateSize(self, capital:(float or pd.Series), risk:(float or pd.Series), 
-                           price:(float or pd.Series), asset_risk:(float or pd.Series)=1, 
-                           currency:(float or pd.Series)=1) -> (float or pd.Series):
+                           price:(float or pd.Series), asset_pct_risk:(float or pd.Series)=1, 
+                           currency:(float or pd.Series)=1, min_size:float=1
+                           ) -> (float or pd.Series):
         
         if self.type == self.Type.SIZE:
-            self.position = capital * self.value * risk / (price * currency * asset_risk)
+            self.position = capital * self.value * risk / (currency * price * asset_pct_risk)
         elif self.type == self.Type.PRICE:
-            self.position = capital * risk / (price * self.value * currency * asset_risk)
+            self.position = capital * risk / (self.value * currency * price * asset_pct_risk)
         else:
             raise ValueError('Not a valid Type of leverage')
         
+        if isinstance(self.position, pd.Series):
+            # self.position = np.where(self.position * price * currency > capital, 
+            #                          capital /(price * currency), self.position)
+            self.position = np.where(self.position < min_size, min_size, np.floor(self.position))
+        else:
+            # if self.position * price * currency > capital:
+            #     self.position = capital /(price * currency)
+            self.position = max([min_size, math.floor(self.position)])
+        
         return self.position
         
-    def calculateRequiredCapital(self, price:(float or pd.Series), 
+    def calculateRequiredCapital(self, risk:(float or pd.Series), 
+                                 price:(float or pd.Series), 
+                                 asset_pct_risk:(float or pd.Series)=1, 
+                                 currency:(float or pd.Series)=1, 
                                  position:(float or pd.Series)=None, 
                                  unleveraged:bool=False
                                  ) -> (float or pd.Series):
@@ -80,10 +314,10 @@ class Leverage:
 
         if unleveraged:
             if self.type == self.Type.PRICE:
-                return position * price * self.value
+                return position * price * currency * asset_pct_risk * self.value / risk
         else:
             if self.type == self.Type.SIZE:
-                return position/self.value * price
+                return position * price * currency * asset_pct_risk / (self.value * risk)
             
         self.required_capital = position * price
             
@@ -92,9 +326,10 @@ class Leverage:
     def calculateReturn(self, entry:(float or pd.Series), 
                         exit:(float or pd.Series), 
                         rcapital: (float or pd.Series),
+                        asset_pct_risk:(float or pd.Series),
                         position:(float or pd.Series)=None,
                         currency:(float or pd.Series)=1,
-                        unleveraged:bool=False,
+                        unleveraged:bool=False, risk:float=0.2,
                         pct:bool=True) -> (float or pd.Series):
 
         if not isinstance(position, pd.Series) and position == None:
@@ -109,8 +344,11 @@ class Leverage:
 
         if pct:
             capital_required: (float or pd.Series) = self.calculateRequiredCapital(
+                                                         risk=risk,
                                                          price=rcapital, # No debería ser entry? Ahora es unadjusted 
-                                                         position=position, 
+                                                         position=position,
+                                                         currency=currency,
+                                                         asset_pct_risk=asset_pct_risk, 
                                                          unleveraged=unleveraged)
             self.pct_ret: bool = True
             self.ret: (float or pd.Series) = self.ret / capital_required.shift(1)
@@ -291,17 +529,19 @@ class Metrics:
     wr: float = None
     std_dev: float = None
     drawdown: pd.Series = pd.Series()
+    transition: Transitions = Transitions()
     
-    def __init__(self, returns:pd.Series, frequency:Frequency=Frequency.NATURAL,
-                 compound:bool=True, annualized:bool=True) -> None:
+    def __init__(self, returns:pd.Series, from_frequency:Frequency=Frequency.DAY, 
+                 to_frequency:Frequency=Frequency.NATURAL, compound:bool=True) -> None:
         
-        self.frequency: Frequency = frequency
+        self.orig_frequency: Frequency = from_frequency
+        self.frequency: Frequency = to_frequency
         self.compound: bool = compound
-        self.annualized: bool = annualized
-        self.returns: pd.Series = self._changeReturnsFrequency(returns=returns, 
-                                                               frequency=frequency)
-        self.annualized_ret: pd.Series = self._changeReturnsFrequency(returns=returns,
-                                                                frequency=Frequency.YEAR)
+        self.returns: pd.Series = returns.copy()
+        self.cumret: pd.Series = self._cumReturns(returns=returns)
+        self.transition: float = 1/Transitions().getChange(first_frequency=self.orig_frequency, 
+                                    second_frequency=self.frequency)
+        # self.annualized_ret: pd.Series = self._changeReturnsFrequency(returns=returns, frequency=Frequency.YEAR)
     
     def _changeReturnsFrequency(self, returns:pd.Series, frequency:Frequency=Frequency.NATURAL
                                 ) -> pd.Series:
@@ -321,27 +561,25 @@ class Metrics:
     def _cumReturns(self, returns:pd.Series=pd.Series()) -> pd.Series:
 
         if returns.empty:
-            returns = self.annualized_ret.copy() if self.annualized \
-                    else self.returns.copy()
+            returns = self.returns.copy()
             
         if self.compound:
-            return (1 + returns).cumprod() - 1
+            self.cumret = (1 + returns).cumprod() - 1
         else:
-            return returns.cumsum()
+            self.cumret = returns.cumsum()
+
+        return self.cumret
     
     def _drawdown(self) -> pd.Series:
-
-        returns = self.annualized_ret.copy() if self.annualized \
-                    else self.returns.copy()
         
-        cumret: pd.Series = self._cumReturns(returns=returns) + 1
+        cumret: pd.Series = self.cumret + 1
         self.drawdown = 1 - cumret/cumret.cummax()
         
         return self.drawdown
         
     def _removeZeros(self, inplace:bool=False) -> pd.Series:
         
-        temp = self.annualized_ret.copy() if self.annualized else self.returns.copy()
+        temp = self.returns.copy()
         temp[temp == 0] = float('nan')
         if inplace:
             self.returns = temp
@@ -351,20 +589,21 @@ class Metrics:
     def _demean(self, returns:pd.Series=pd.Series()) -> pd.Series:
         
         if returns.empty:
-            returns = self.annualized_ret.copy() if self.annualized \
-                    else self.returns.copy()
+            returns = self.returns.copy()
             
         return returns - returns.mean()
     
     def _tailRatio(self, quantiles:list=[], quantile_1:float=None, quantile_2:float=None,
               exact_norm:bool=True) -> float:
         
+        if quantile_1 != None and quantile_2 != None:
+            quantiles = [quantile_1, quantile_2]
+
         if len(quantiles) >= 2:
-            q_extreme: float = max([abs(0.5-q) for q in quantiles])
-            q_std: float = min([abs(0.5-q) for q in quantiles])
-        elif quantile_1 != None and quantile_2 != None:
-            q_extreme: float = max([abs(0.5 - quantile_1), abs(0.5 - quantile_2)])
-            q_std: float = min([abs(0.5 - quantile_1), abs(0.5 - quantile_2)])
+            q_extreme: float = [q for q in quantiles if abs(0.5-q) == \
+                                max([abs(0.5-q) for q in quantiles])][0]
+            q_std: float = [q for q in quantiles if abs(0.5-q) == \
+                                min([abs(0.5-q) for q in quantiles])][0]
             
         demean: pd.Series = self._demean(returns=self._removeZeros(inplace=False))
         pr: float = demean.quantile(q_extreme) / demean.quantile(q_std)
@@ -376,24 +615,47 @@ class Metrics:
 
         return pr / norm_dist_ratio
 
+    def rateOfReturn(self) -> float:
+        
+        rate = self.transition * len(self.returns)
+
+        if self.compound:
+            self.rate_ret = (self.cumret.iloc[-1] + 1) ** (1/rate) - 1
+        else:
+            self.rate_ret = self.cumret.iloc[-1] / rate
+        
+        return self.rate_ret
+    
     def averageReturn(self) -> float:
         
-        self.avg_ret = self.annualized_ret.mean() \
-            if self.annualized else self.returns.mean()
+        self.avg_ret = self.returns.mean()
+
+        if self.compound:
+            self.avg_ret = (1 + self.avg_ret) ** self.transition - 1
+        else:
+            self.avg_ret = self.avg_ret * self.transition
         
         return self.avg_ret
 
     def averageWin(self) -> float:
         
-        self.avg_win = self.annualized_ret[self.annualized_ret > 0].mean() \
-            if self.annualized else self.returns[self.returns > 0].mean()
+        self.avg_win = self.returns[self.returns > 0].mean()
+        
+        if self.compound:
+            self.avg_win = (1 + self.avg_win) ** self.transition - 1
+        else:
+            self.avg_win = self.avg_win * self.transition
         
         return self.avg_win
     
     def averageLoss(self) -> float:
         
-        self.avg_win = self.annualized_ret[self.annualized_ret < 0].mean() \
-            if self.annualized else self.returns[self.returns < 0].mean()
+        self.avg_loss = self.returns[self.returns < 0].mean()
+        
+        if self.compound:
+            self.avg_loss = (1 + self.avg_loss) ** self.transition - 1
+        else:
+            self.avg_loss = self.avg_loss * self.transition
         
         return self.avg_loss
     
@@ -438,15 +700,13 @@ class Metrics:
     
     def skew(self) -> float:
         
-        self.dist_skew = self.annualized_ret.skew() \
-            if self.annualized else self.returns.skew()
+        self.dist_skew = self.returns.skew() * 1/self.transition**(1/2)
         
         return self.dist_skew
     
     def standardDeviation(self) -> float:
         
-        self.std_dev = self.annualized_ret.std() \
-            if self.annualized else self.returns.std()
+        self.std_dev = self.returns.std() * (self.transition ** (1/2))
         
         return self.std_dev
     
@@ -506,9 +766,10 @@ class Metrics:
             
     def to_dict(self) -> dict:
         
-        return {k: v for k, v in self.__dict__.items() \
+        return {k: (v._value_ if isinstance(v, Frequency) else v) \
+                for k, v in self.__dict__.items() \
             if k not in ['returns', 'drawdown', 'compound', 'frequency', 
-                         'annualized', 'annualized_ret']}
+                         'cumret', 'transition', 'orig_frequency']}
 
 class Returns:
 
@@ -516,7 +777,7 @@ class Returns:
         SIMPLE = 'simple'
         COMPOUND = 'compound'
 
-    def __init__(self, adjusted:pd.Series, current:pd.Series, 
+    def __init__(self, adjusted:pd.Series, current:pd.Series, currency:pd.Series=pd.Series(), 
                  calc_type:Type=Type.COMPOUND) -> None:
 
         # Check if any error
@@ -527,33 +788,103 @@ class Returns:
         elif not adjusted.empty and current.empty:
             current: pd.Series = adjusted.copy()
 
-        self.adjusted: pd.Series = adjusted
-        self.current: pd.Series = current
-        self.calc_type: self.Type = calc_type
 
-    def calculatePricePercChange(self, frequency:Frequency=Frequency.NATURAL) -> pd.Series:
+        if isinstance(currency, float) or isinstance(currency, int):
+            currency: pd.Series = pd.Series(currency, index=self.adjusted.index)
+        elif isinstance(currency, pd.Series) and currency.empty:
+            currency = pd.Series(1, adjusted.index)
+
+        self.adjusted: pd.Series = adjusted.copy()
+        self.current: pd.Series = current.copy()
+        self.currency: pd.Series = currency.copy()
+        self.calc_type: self.Type = calc_type
+        self.volatility: pd.Series = self.calculateVolatilityEstimator()
+
+    def calculateVolatilityEstimator(self, n:int=5, m:int=10, pct:bool=True, 
+                                     annualized:bool=True) -> pd.Series:
+        
+        change: pd.Series = self.calculatePricePercChange(pct=pct)
+
+        std: pd.Series = change.ewm(span=n).std()
+        if annualized:
+            std = std * (Transitions().getChange(Frequency.DAY, Frequency.YEAR) ** 0.5)
+        self.volatility = 0.7*std + 0.3*std.rolling(m, min_periods=1).mean()
+
+        return self.volatility
+        
+    def calculateSize(self, data:pd.DataFrame, capital:float, risk:float, min_size:int=1, 
+                    leverage:Leverage=Leverage(type=Leverage.Type.SIZE, value=1), 
+                    compound:Type=Type.COMPOUND) -> pd.DataFrame:
+
+        leverage = copy.deepcopy(leverage)
+
+        # Set default values
+        price: pd.Series = self.adjusted.copy()
+
+        # Check for errors
+        if len(self.currency) != len(price): 
+            raise ValueError(f'Length of currency and price are different: {len(self.currency)} vs. {len(price)}')
+        if isinstance(self.volatility, pd.Series):
+            if len(self.currency) != len(self.volatility): 
+                raise ValueError(f'Length of currency and volat_target are different: {len(self.currency)} vs. {len(self.volatility)}')
+            if len(self.volatility) != len(price): 
+                raise ValueError(f'Length of volat_target and price are different: {len(self.volatility)} vs. {len(price)}')
+        
+        # Calculate data
+        temp_df: pd.DataFrame = pd.DataFrame(index=data.index)
+        temp_df['price'] = price
+        temp_df['currency'] = self.currency
+        temp_df['volat_target'] = self.volatility * price
+        temp_df.dropna(inplace=True)
+
+        if compound == Returns.Type.SIMPLE:
+            size: pd.Series = leverage.calculateSize(capital=capital, risk=risk, price=temp_df['price'], 
+                                                    currency=temp_df['currency'], 
+                                                    asset_pct_risk=temp_df['volat_target'],
+                                                    min_size=min_size)
+            capital: pd.Series = ((temp_df['price'] - temp_df['price'].shift(periods=1)) * size).cumsum() + capital
+        elif compound == Returns.Type.COMPOUND:
+            size: list = [0]
+            capital: list = [capital]
+            prev_day = None
+            for i in temp_df.index:
+                day = temp_df.loc[i]
+                if not isinstance(prev_day, pd.Series):
+                    prev_day = day
+                    continue
+                print(f"{capital[-1]} * {leverage.value} * {risk} / ({day['price']} * {day['currency']} * {day['volat_target']})")
+                size.append(leverage.calculateSize(capital=capital[-1], risk=risk, price=day['price'], 
+                                                asset_pct_risk=day['volat_target'], currency=day['currency'],
+                                                min_size=min_size))
+                capital.append(capital[-1] + size[-1] * (day['price'] - prev_day['price']))
+                prev_day = day
+
+            capital: pd.Series = pd.Series(capital, index=temp_df.index)
+            size: pd.Series = pd.Series(size, index=temp_df.index)
+            
+        last: int = min(len(size), len(capital))
+
+        data: pd.DataFrame = data.tail(last)
+        data['size'] = size[-last:]
+        data['capital'] = capital[-last:]
+        data['drawdown'] = 1 - data['capital']/data['capital'].cummax()
+
+        return data
+
+    def calculatePricePercChange(self, pct:bool=True) -> pd.Series:
 
         # Calculate Percentage Change
-        percentage_changes: pd.Series = self.adjusted.diff(periods=1) / self.current.shift(periods=1)
+        percentage_changes: pd.Series = self.adjusted.diff(periods=1)
+        if pct:
+            percentage_changes = percentage_changes / self.current.shift(periods=1)
 
-        # Change returns frequency
-        perc_changes_at_freq: pd.Series = self.changeReturnsFrequency(returns=percentage_changes, 
-                                                                frequency=frequency)
+        return percentage_changes
 
-        return perc_changes_at_freq
-
-    def calculatePercReturns(self, position_size:(float or pd.Series), 
-                            currency:pd.Series=pd.Series(), 
+    def calculatePercReturns(self, position_size:(float or pd.Series), risk:float=0.2,
                             leverage:Leverage=Leverage(type=Leverage.Type.SIZE, value=1.0), 
                             frequency:Frequency=Frequency.NATURAL) -> pd.Series:
         
         leverage = copy.deepcopy(leverage)
-
-        # Give default values
-        if isinstance(currency, float) or isinstance(currency, int):
-            currency: pd.Series = pd.Series(currency, index=self.adjusted.index)
-        elif currency.empty:
-            currency: pd.Series = pd.Series(1, index=self.adjusted.index)
 
         if isinstance(position_size, float) or isinstance(position_size, int):
             position_size: pd.Series = pd.Series(position_size, index=self.adjusted.index)
@@ -561,9 +892,11 @@ class Returns:
             position_size: pd.Series = pd.Series(1, index=self.adjusted.index)
 
         # Calculate returns
-        perc_return: pd.Series = leverage.calculateReturn(entry=self.adjusted.shift(periods=1), rcapital=self.current,
-                                            exit=self.adjusted, position=position_size.shift(periods=1),
-                                            currency=currency, unleveraged=True, pct=True)
+        perc_return: pd.Series = leverage.calculateReturn(entry=self.adjusted.shift(periods=1), 
+                                            rcapital=self.current, exit=self.adjusted, 
+                                            position=position_size.shift(periods=1),
+                                            asset_pct_risk=self.volatility, risk=risk,
+                                            currency=self.currency, unleveraged=True, pct=True)
 
         # Change returns frequency
         perc_return_at_freq: pd.Series = self.changeReturnsFrequency(returns=perc_return, frequency=frequency)
@@ -646,16 +979,15 @@ def calculateSize(data:pd.DataFrame, capital:float, risk:float, volat_target:(fl
     temp_df: pd.DataFrame = pd.DataFrame(index=data.index)
     temp_df['price'] = price
     temp_df['currency'] = currency
-    temp_df['volat_target'] = volat_target
+    temp_df['volat_target'] = volat_target * price
     temp_df.dropna(inplace=True)
 
     if compound != Returns.Type.COMPOUND:
         size: pd.Series = leverage.calculateSize(capital=capital, risk=risk, price=temp_df['price'], 
                                                  currency=temp_df['currency'], 
-                                                 asset_risk=temp_df['volat_target'])
+                                                 asset_pct_risk=temp_df['volat_target'])
         size: pd.Series = np.where(size < min_size, min_size, size)
-        size: pd.Series = pd.Series(1, index=temp_df.index)
-        capital: pd.Series = (temp_df['price'] - temp_df['price'].shift(periods=1)) * size
+        capital: pd.Series = ((temp_df['price'] - temp_df['price'].shift(periods=1)) * size).cumsum() + capital
     else:
         size: list = [0]
         capital: list = [capital]
@@ -665,9 +997,9 @@ def calculateSize(data:pd.DataFrame, capital:float, risk:float, volat_target:(fl
             if not isinstance(prev_day, pd.Series):
                 prev_day = day
                 continue
-                
+            print(f"{capital[-1]} * {leverage.value} * {risk} / ({day['price']} * {day['currency']} * {day['volat_target']})")
             size.append(leverage.calculateSize(capital=capital[-1], risk=risk, price=day['price'], 
-                                               asset_risk=day['volat_target'], currency=day['currency']))
+                                               asset_pct_risk=day['volat_target'], currency=day['currency']))
             capital.append(capital[-1] + size[-1] * (day['price'] - prev_day['price']))
             prev_day = day
 
@@ -680,15 +1012,28 @@ def calculateSize(data:pd.DataFrame, capital:float, risk:float, volat_target:(fl
     data: pd.DataFrame = data.tail(last)
     data['size'] = size[-last:]
     data['capital'] = capital[-last:]
+    data['drawdown'] = 1 - data['capital']/data['capital'].cummax()
 
     return data
 
-def volatAproximation(data:pd.DataFrame) -> pd.DataFrame:
+def calculateTurnover(position:pd.Series) -> float:
+
+    pct_change: pd.Series = position.diff().abs() / position.shift(1)
+
+    return pct_change.mean()
+
+def volatAproximation(data:pd.DataFrame, exponential:bool=False, pct:bool=True) -> pd.DataFrame:
 
     data['std'] = data['Close'].rolling(22).std()
     data['std_mas'] = data['std'].rolling(20).mean()
     data['std_mal'] = data['std'].rolling(100).mean()
-    data['vol'] = 0.7*data['Close'].rolling(5).std() + 0.3*data['Close'].rolling(10).std()
+    if exponential:
+        data['vol'] = 0.7*data['Close'].ewm(span=5).std() + 0.3*data['Close'].ewm(span=10).std()
+    else:
+        data['vol'] = 0.7*data['Close'].rolling(5).std() + 0.3*data['Close'].rolling(10).std()
+    if pct:
+        data['vol'] = data['vol'] / data['Close']
+    
     data.dropna(inplace=True)
 
     return data
@@ -696,35 +1041,34 @@ def volatAproximation(data:pd.DataFrame) -> pd.DataFrame:
 capital = 5000
 risk = 0.20
 min_size = 1
-leverage = Leverage(type=Leverage.Type.SIZE, value=5)
-compound = Returns.Type.COMPOUND
+leverage = Leverage(type=Leverage.Type.SIZE, value=1)
+compound = Returns.Type.SIMPLE
 
-data: pd.DataFrame = getData('SPY')
+data: pd.DataFrame = getData('AAPL')
 data, currency = getCurrencyForData('EURUSD=X', data=data, inverse=True)
 
-data = calculateSize(data=data, price_name='underlying', capital=capital, 
-                     risk=risk, volat_target=0.2, #currency=currency['Close'], 
-                     leverage=leverage, min_size=min_size, compound=compound)
 
-data['drawdown'] = 1 - data['capital']/data['capital'].cummax()
-returnsObj = Returns(adjusted=data['Close'], current=data['Close'], calc_type=compound)
-returns = returnsObj.calculatePercReturns(position_size=pd.Series(5, index=data.index), 
-                                          currency=currency['Close'], leverage=leverage, 
+returnsObj = Returns(adjusted=data['Close'], current=data['Close'], 
+                     currency=currency['Close'], calc_type=compound)
+returnsObj.calculateVolatilityEstimator(n=32, m=10*Transitions().BUSINESS_DAYS_IN_YEAR)
+data = returnsObj.calculateSize(data=data, capital=capital, risk=risk, 
+                                leverage=leverage, min_size=min_size, 
+                                compound=compound)
+returns = returnsObj.calculatePercReturns(position_size=data['size'],# pd.Series(5, index=data.index), 
+                                          leverage=leverage, risk=risk, 
                                           frequency=Frequency.NATURAL)
 
 import json
 
-metrics = Metrics(returns=returns, frequency=Frequency.YEAR, compound=False, 
-                  annualized=True)
+metrics = Metrics(returns=returns, from_frequency=Frequency.DAY, 
+                  to_frequency=Frequency.YEAR, compound=False)
 stats = metrics.calculateMetrics(indicators=['averageReturn','standardDeviation', 
                                              'sharpeRatio','skew', 'averageDrawdown', 
                                              'maxDrawdown','lowerTailRatio', 
                                              'upperTailRatio'], return_dict=True)
-print(json.dumps(stats, indent=4))
+print(json.dumps({**stats, **{'turnouver': calculateTurnover(data['size'])}}, indent=4))
 
-'1982-12-14'
-
-if False:
+if True:
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.0,
                         row_heights=[3,1],
                         specs=[[{'secondary_y': True}],[{'secondary_y': False}]])
@@ -736,7 +1080,7 @@ if False:
     fig.add_trace(go.Scatter(x=data.index, y=data['capital'].cummax(), name='MaxBalance'), 
                     row=1, col=1, secondary_y=False)
     fig.add_trace(go.Scatter(x=data.index, y=data['size'], name='Size'), row=2, col=1)
-    fig.add_trace(go.Scatter(x=data.index, y=data['vol'], name='Vol'), row=2, col=1)
+    #fig.add_trace(go.Scatter(x=data.index, y=data['vol'], name='Vol'), row=2, col=1)
 
     fig.update_yaxes(title_text='Return ($)', row=1, col=1, secondary_y=False)
     fig.update_yaxes(title_text='DrawDown (%)', row=1, col=1, secondary_y=True)

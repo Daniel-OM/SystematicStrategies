@@ -54,7 +54,8 @@ def calculate_perc_returns(position_contracts_held: pd.Series,
     fx_series_aligned = fx_series.reindex(return_instrument_currency.index, method="ffill")
     return_base_currency = return_instrument_currency * fx_series_aligned
 
-    perc_return = return_base_currency / capital_required.shift(1)
+    perc_return = return_base_currency / (capital_required.shift(1) \
+                if isinstance(capital_required, pd.Series) else capital_required)
 
     return perc_return
 
@@ -164,10 +165,10 @@ def ann_std_given_frequency(perc_return_at_freq: pd.Series,
 
 
 def calculate_drawdown(perc_return):
-    cum_perc_return = perc_return.cumsum()
+    cum_perc_return = perc_return.cumsum() + 1
     max_cum_perc_return = cum_perc_return.rolling(len(perc_return)+1,
                                                   min_periods=1).max()
-    return max_cum_perc_return - cum_perc_return
+    return 1 - cum_perc_return/max_cum_perc_return
 
 QUANT_PERCENTILE_EXTREME = 0.01
 QUANT_PERCENTILE_STD = 0.3
@@ -213,4 +214,6 @@ if __name__ == '__main__':
         multiplier=multiplier
     )
 
-    print(calculate_stats(perc_return, at_frequency=MONTH))
+    import json
+    print(json.dumps(calculate_stats(perc_return, at_frequency=MONTH), indent=4))
+    #print(calculate_stats(perc_return, at_frequency=MONTH))

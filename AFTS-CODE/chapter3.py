@@ -18,7 +18,7 @@ import matplotlib
 
 matplotlib.use("TkAgg")
 
-from copy import copy
+import copy
 
 import pandas as pd
 
@@ -104,7 +104,7 @@ class standardDeviation(pd.Series):
         self._current_price = current_price
 
     def daily_risk_price_terms(self):
-        stdev = copy(self)
+        stdev = copy.copy(self)
         if self.annualised:
             stdev = stdev / (BUSINESS_DAYS_IN_YEAR ** 0.5)
 
@@ -114,7 +114,7 @@ class standardDeviation(pd.Series):
         return stdev
 
     def annual_risk_price_terms(self):
-        stdev = copy(self)
+        stdev = copy.copy(self)
         if not self.annualised:
             # daily
             stdev = stdev * (BUSINESS_DAYS_IN_YEAR ** 0.5)
@@ -149,6 +149,7 @@ def calculate_position_series_given_variable_risk(
     ## resolves to N = (Capital × τ) ÷ (Multiplier × FX × daily stdev price terms × 16)
     ## for simplicity we use the daily risk in price terms, even if we calculated annualised % returns
     daily_risk_price_terms = instrument_risk.daily_risk_price_terms()
+    print(daily_risk_price_terms)
 
     return (
         capital
@@ -179,6 +180,12 @@ if __name__ == "__main__":
 
     capital = 100000  ## applies only to strategy 1
 
+    adjusted_price = data['Close'].copy()
+    current_price = data['Close'].copy()
+    fx_series = currency['Close'].copy()
+    capital = 5000
+    multiplier = 1
+    risk_target_tau = 0.2
     ## eithier use annual # % returns, or daily price differences to calculate
     instrument_risk = standardDeviation(
         adjusted_price=adjusted_price,
@@ -212,14 +219,14 @@ if __name__ == "__main__":
     )
 
     print(calculate_stats(perc_return))
-    print(calculate_stats(perc_return), MONTH)
+    print(position_contracts_held)
 
     print(
         calculate_minimum_capital(
             multiplier=multiplier,
             risk_target=risk_target_tau,
-            fx=1,
-            instrument_risk_ann_perc=instrument_risk_ann_perc[-1],
+            fx=fx_series,
+            instrument_risk_ann_perc=instrument_risk[-1],
             price=current_price[-1],
         )
     )
