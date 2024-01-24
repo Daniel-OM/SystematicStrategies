@@ -801,13 +801,13 @@ class Returns:
         self.volatility: pd.Series = self.calculateVolatilityEstimator()
 
     def calculateVolatilityEstimator(self, n:int=5, m:int=10, pct:bool=True, 
-                                     annualized:bool=True) -> pd.Series:
+                                     annualized:bool=False) -> pd.Series:
         
-        change: pd.Series = self.calculatePricePercChange(pct=pct)
+        change: pd.Series = self.calculatePriceChange(pct=pct)
 
         std: pd.Series = change.ewm(span=n).std()
         if annualized:
-            std = std * (Transitions().getChange(Frequency.DAY, Frequency.YEAR) ** 0.5)
+            std = std * (Transitions().getChange(Frequency.BUSINESSDAY, Frequency.YEAR) ** 0.5)
         self.volatility = 0.7*std + 0.3*std.rolling(m, min_periods=1).mean()
 
         return self.volatility
@@ -871,7 +871,7 @@ class Returns:
 
         return data
 
-    def calculatePricePercChange(self, pct:bool=True) -> pd.Series:
+    def calculatePriceChange(self, pct:bool=True) -> pd.Series:
 
         # Calculate Percentage Change
         percentage_changes: pd.Series = self.adjusted.diff(periods=1)

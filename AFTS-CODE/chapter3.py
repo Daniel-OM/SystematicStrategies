@@ -148,13 +148,11 @@ def calculate_position_series_given_variable_risk(
     # N = (Capital × τ) ÷ (Multiplier × Price × FX × σ %)
     ## resolves to N = (Capital × τ) ÷ (Multiplier × FX × daily stdev price terms × 16)
     ## for simplicity we use the daily risk in price terms, even if we calculated annualised % returns
-    daily_risk_price_terms = instrument_risk.daily_risk_price_terms()
-    print(daily_risk_price_terms)
+    annual_risk_price_terms = instrument_risk.annual_risk_price_terms()
+    print(annual_risk_price_terms)
 
     return (
-        capital
-        * risk_target_tau
-        / (multiplier * fx * daily_risk_price_terms * (BUSINESS_DAYS_IN_YEAR ** 0.5))
+        capital * risk_target_tau / (multiplier * fx * annual_risk_price_terms)
     )
 
 
@@ -169,16 +167,16 @@ def calculate_turnover(position, average_position):
 
 if __name__ == "__main__":
     ## Get the file from https://gitfront.io/r/user-4000052/iTvUZwEUN2Ta/AFTS-CODE/blob/sp500.csv
-    data = pd_readcsv("sp500.csv")
-    data = data.dropna()
+    # data = pd_readcsv("sp500.csv")
+    # data = data.dropna()
 
-    adjusted_price = data.adjusted
-    current_price = data.underlying
-    multiplier = 5
-    risk_target_tau = 0.2
-    fx_series = pd.Series(1, index=data.index)  ## FX rate, 1 for USD / USD
+    # adjusted_price = data.adjusted
+    # current_price = data.underlying
+    # multiplier = 5
+    # risk_target_tau = 0.2
+    # fx_series = pd.Series(1, index=data.index)  ## FX rate, 1 for USD / USD
 
-    capital = 100000  ## applies only to strategy 1
+    # capital = 100000  ## applies only to strategy 1
 
     adjusted_price = data['Close'].copy()
     current_price = data['Close'].copy()
